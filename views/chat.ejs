@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Чат - Отдел кадров</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <button onclick="window.location.href='/'">🏠 Главная</button>
+            <span>💬 Чат отдела кадров</span>
+        </div>
+        
+        <div class="chat-body">
+            <div class="users-sidebar">
+                <h4>👥 В сети</h4>
+                <div id="users-list"></div>
+            </div>
+            
+            <div class="chat-main">
+                <div class="messages-area" id="chat-window">
+                    <div class="notification">✨ Добро пожаловать в чат! ✨</div>
+                </div>
+                
+                <div class="typing-area">
+                    <div id="typingIndicator" class="typing-indicator hidden"></div>
+                    <input id="msgInput" type="text" placeholder="Введите сообщение...">
+                    <button id="sendBtn">📤 Отправить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        let typingTimeout = null;
+        let currentUserName = "";
+        
+        const name = prompt("Введите ваше имя для чата:") || "Аноним";
+        currentUserName = name;
+        
+        socket.emit("register", name);
+        
+        socket.on("clientsList", (clients) => {
+            const usersList = document.getElementById("users-list");
+            usersList.innerHTML = "";
+            
+            Object.values(clients).forEach(client => {
+                const userDiv = document.createElement("div");
+                userDiv.className = "user-item online";
+                userDiv.innerHTML = client.name === name ? `👤 ${client.name} (Вы)` : `🟢 ${client.name}`;
+                usersList.appendChild(userDiv);
+            });
+        });
+        
+        socket.on("messageHistory", (messages) => {
+            const win = document.getElementById("chat-window");
+            messages.forEach(msg => {
+                addMessageToChat(msg.from, msg.text, msg.from === name, msg.timestamp);
+            });
+        });
+        
+        socket.on("chatMessage", ({ from, text, timestamp }) => {
+            addMessageToChat(from, text, from === name, timestamp);
+        });
+        
+        socket.on("userTyping", ({ name: typingUserName, isTyping }) => {
+            const typingIndicator = document.getElementById("typingIndicator");
+            
+            if (isTyping && typingUserName !== currentUserName) {
+                typingIndicator.innerHTML = `✏️ ${typingUserName} печатает...`;
+                typingIndicator.classList.remove("hidden");
+            } else {
+                typingIndicator.classList.add("hidden");
+            }
+        });
+        
+        socket.on("userDisconnected", ({ name: disconnectedName }) => {
+            addSystemMessage(`👋 ${disconnectedName} покинул чат`);
+        });
+        
+        function addMessageToChat(sender, text, isMyMessage, timestamp) {
+            const win = document.getElementById("chat-window");
+            const messageDiv = document.createElement("div");
+            messageDiv.className = `message ${isMyMessage ? 'my-message' : ''}`;
+            
+            const time = timestamp ? new Date(timestamp).toLocaleTimeString() : new Date().toLocaleTimeString();
+            
+            messageDiv.innerHTML = `
+                <div class="sender">${escapeHtml(sender)}</div>
+                <div class="text">${escapeHtml(text)}</div>
+                <div class="time">${time}</div>
+            `;
+            
+            win.appendChild(messageDiv);
+            win.scrollTop = win.scrollHeight;
+        }
+        
+        function addSystemMessage(text) {
+            const win = document.getElementById("chat-window");
+            const notifDiv = document.createElement("div");
+            notifDiv.className = "notification";
+            notifDiv.innerHTML = text;
+            win.appendChild(notifDiv);
+            win.scrollTop = win.scrollHeight;
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        const sendMessage = () => {
+            const input = document.getElementById("msgInput");
+            const text = input.value.trim();
+            
+            if (text) {
+                socket.emit("message", text);
+                input.value = "";
+                socket.emit("stopTyping");
+            }
+        };
+        
+        const handleTyping = () => {
+            socket.emit("typing");
+            
+            if (typingTimeout) clearTimeout(typingTimeout);
+            
+            typingTimeout = setTimeout(() => {
+                socket.emit("stopTyping");
+            }, 1000);
+        };
+        
+        document.getElementById("sendBtn").onclick = sendMessage;
+        document.getElementById("msgInput").onkeypress = (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            } else {
+                handleTyping();
+            }
+        };
+        
+        document.getElementById("msgInput").oninput = handleTyping;
+    </script>
+</body>
+</html>

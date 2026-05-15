@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Управление сотрудниками</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>📋 Управление сотрудниками</h1>
+        
+        <div class="controls">
+            <button onclick="window.location.href='/'">🏠 Главная</button>
+            <button onclick="window.location.href='/chat'">💬 Чат</button>
+        </div>
+
+        <div class="form-container">
+            <h3>➕ Добавить сотрудника</h3>
+            <div class="form-group">
+                <input type="text" id="nameInput" placeholder="ФИО">
+                <input type="text" id="positionInput" placeholder="Должность">
+                <input type="number" id="salaryInput" placeholder="Зарплата">
+                <button id="addButton">Добавить</button>
+            </div>
+        </div>
+
+        <div class="list-container">
+            <h3>📋 Список сотрудников</h3>
+            <div id="employeesList">
+                <% if (employees && employees.length > 0) { %>
+                    <% employees.forEach(emp => { %>
+                        <div class="employee-card" data-id="<%= emp.id %>">
+                            <div class="employee-info">
+                                <div class="employee-name">👤 <%= emp.name %></div>
+                                <div class="employee-position">💼 <%= emp.position %></div>
+                                <div class="employee-salary">💰 <%= emp.salary.toLocaleString() %> ₽</div>
+                            </div>
+                            <div>
+                                <button class="edit-btn" data-id="<%= emp.id %>" data-name="<%= emp.name %>" data-position="<%= emp.position %>" data-salary="<%= emp.salary %>">✏️</button>
+                                <button class="delete-btn" data-id="<%= emp.id %>">🗑</button>
+                            </div>
+                        </div>
+                    <% }); %>
+                <% } else { %>
+                    <div class="empty-message">📭 Нет сотрудников. Добавьте первого!</div>
+                <% } %>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function addEmployee() {
+            const name = document.getElementById('nameInput').value;
+            const position = document.getElementById('positionInput').value;
+            const salary = parseInt(document.getElementById('salaryInput').value);
+            
+            if (!name || !position || !salary) {
+                alert('Заполните все поля!');
+                return;
+            }
+            
+            await fetch('/items', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, position, salary })
+            });
+            
+            window.location.reload();
+        }
+        
+        document.getElementById('addButton').addEventListener('click', addEmployee);
+        
+        document.getElementById('nameInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') addEmployee();
+        });
+        document.getElementById('positionInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') addEmployee();
+        });
+        document.getElementById('salaryInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') addEmployee();
+        });
+        
+        // Обработчики для кнопок (через data-атрибуты)
+        document.addEventListener('DOMContentLoaded', () => {
+            // Удаление
+            document.querySelectorAll('.delete-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const id = btn.getAttribute('data-id');
+                    if (confirm('Удалить сотрудника?')) {
+                        await fetch(`/items/${id}`, { method: 'DELETE' });
+                        window.location.reload();
+                    }
+                });
+            });
+            
+            // Редактирование
+            document.querySelectorAll('.edit-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const id = btn.getAttribute('data-id');
+                    const oldName = btn.getAttribute('data-name');
+                    const oldPosition = btn.getAttribute('data-position');
+                    const oldSalary = btn.getAttribute('data-salary');
+                    
+                    const name = prompt("Новое имя:", oldName);
+                    const position = prompt("Новая должность:", oldPosition);
+                    const salary = prompt("Новая зарплата:", oldSalary);
+                    
+                    if (name && position && salary) {
+                        await fetch(`/items/${id}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ name, position, salary: parseInt(salary) })
+                        });
+                        window.location.reload();
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
